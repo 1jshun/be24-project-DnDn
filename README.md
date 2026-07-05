@@ -6,12 +6,10 @@
 
 ## 바로가기
 
-- **Service** : [DnDn](https://www.dndn24.kro.kr)
-- **API Docs** : [DndnCore API](https://1jshun.github.io/DnDn-Architecture/)
-- **Wiki** : [DnDn Backend Wiki](https://github.com/beyond-sw-camp/be24-fin-Intelli_J-DnDn-BE/wiki)
+- **Service** : [DnDn](https://www.dndn26.kro.kr)
+- **API Docs** : [Swagger UI](https://1jshun.github.io/DnDn-Architecture/)
+- **Wiki** : [DnDn Wiki](https://github.com/beyond-sw-camp/be24-fin-Intelli_J-DnDn-BE/wiki)
 - **Backend Repository** : [be24-fin-Intelli_J-DnDn-BE](https://github.com/beyond-sw-camp/be24-fin-Intelli_J-DnDn-BE)
-
-<br/>
 
 ## 담당 역할
 
@@ -20,14 +18,20 @@
 - Elasticsearch 기반 검색 기능 개선
 - Kubernetes 기반 배포 환경 구성
 
-<br/>
 
 ## 기술 스택
 
 `Java` `Spring Boot` `JPA` `MariaDB` `Kafka` `Elasticsearch`  
 `Spring Cloud Gateway` `Eureka` `Docker` `Kubernetes` `Nginx Ingress` `Jenkins` `Kaniko`
 
+
+## 시스템 아키텍처
+
+<img width="959" height="993" alt="imaasdge" src="https://github.com/user-attachments/assets/8da5c9a5-f17f-425b-9f92-1df84e92c927" />
+
 <br/>
+
+---
 
 ## 1. 일정 관리 API 설계 및 구현
 
