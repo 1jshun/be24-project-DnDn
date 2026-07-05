@@ -1,0 +1,137 @@
+pipeline {
+  // Abort previous frontend builds when concurrent triggers arrive.
+  options {
+    disableConcurrentBuilds(abortPrevious: true)
+    quietPeriod(30)
+  }
+
+  agent {
+    kubernetes {
+      label "node-kaniko-${UUID.randomUUID().toString()}"
+      defaultContainer 'node'
+      yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: worker06
+  restartPolicy: Never
+  containers:
+    - name: node
+      image: node:22.17.1-bullseye
+      command: ['cat']
+      tty: true
+    - name: kaniko
+      image: gcr.io/kaniko-project/executor:debug
+      command: ['/busybox/sh','-c','sleep infinity']
+      tty: true
+      volumeMounts:
+        - name: docker-config
+          mountPath: /kaniko/.docker
+        - name: workspace
+          mountPath: /workspace
+    - name: kubectl
+      image: bitnami/kubectl:latest
+      command: ['sleep', 'infinity']
+      securityContext:
+        runAsUser: 0
+  volumes:
+    - name: workspace
+      emptyDir: {}
+    - name: docker-config
+      secret:
+        secretName: dockerhub-cred
+        items:
+          - key: .dockerconfigjson
+            path: config.json
+"""
+    }
+  }
+
+  environment {
+    IMAGE_NAME = 'seungwoo0128/dndn-frontend'
+  }
+
+  stages {
+    stage('Prepare') {
+      steps {
+        script {
+          def gitShort = (env.GIT_BRANCH ?: '')
+            .replaceFirst(/^refs\/heads\//, '')
+            .replaceFirst(/^origin\//, '')
+          def isMain = (env.BRANCH_NAME == 'main') || (gitShort == 'main')
+          env.TARGET_NAMESPACE = isMain ? 'default' : 'test'
+          env.IMAGE_TAG = isMain ? "2.${env.BUILD_NUMBER}" : "test-2.${env.BUILD_NUMBER}"
+          // API requests use the same host path and are routed by Ingress to the gateway.
+          env.VITE_API_BASE_URL = '/api'
+        }
+      }
+    }
+
+    stage('Gradle Build') {
+      steps {
+        container('node') {
+          sh '''
+            npm i
+            npm run build
+          '''
+        }
+      }
+    }
+
+    stage('Kaniko Build & Push') {
+      steps {
+        container('kaniko') {
+          sh """
+            /kaniko/executor \
+              --context=${WORKSPACE} \
+              --dockerfile=${WORKSPACE}/Dockerfile \
+              --build-arg VITE_API_BASE_URL=${env.VITE_API_BASE_URL} \
+              --destination=${env.IMAGE_NAME}:${env.IMAGE_TAG} \
+              --destination=${env.IMAGE_NAME}:latest \
+              --single-snapshot \
+              --use-new-run \
+              --cache=true \
+              --snapshotMode=redo
+          """
+        }
+      }
+    }
+
+    stage('Result') {
+      steps {
+        echo "Pushed: ${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+        echo "Deploying to Namespace: ${env.TARGET_NAMESPACE}"
+      }
+    }
+
+    stage('Deploy to Kubernetes') {
+      steps {
+        container('kubectl') {
+          script {
+            def activeService = sh(
+              script: "kubectl get ingress frontend-ingress -o jsonpath='{.spec.rules[0].http.paths[0].backend.service.name}' -n ${env.TARGET_NAMESPACE}",
+              returnStdout: true
+            ).trim()
+            def activeVersion   = activeService.contains('blue') ? 'blue' : 'green'
+            def inactiveVersion = activeVersion == 'blue' ? 'green' : 'blue'
+            echo "Active: ${activeVersion} -> Deploying to: ${inactiveVersion}"
+
+            sh "kubectl set image deployment/dndn-frontend-${inactiveVersion} frontend=${env.IMAGE_NAME}:${env.IMAGE_TAG} -n ${env.TARGET_NAMESPACE}"
+            sh "kubectl scale deployment/dndn-frontend-${inactiveVersion} --replicas=2 -n ${env.TARGET_NAMESPACE}"
+            sh "kubectl rollout status deployment/dndn-frontend-${inactiveVersion} --timeout=180s -n ${env.TARGET_NAMESPACE}"
+
+            sh """
+              kubectl patch ingress frontend-ingress --type=json \
+                -p='[{"op":"replace","path":"/spec/rules/0/http/paths/0/backend/service/name","value":"frontend-service-${inactiveVersion}"}]' \
+                -n ${env.TARGET_NAMESPACE}
+            """
+
+            sh "kubectl scale deployment/dndn-frontend-${activeVersion} --replicas=0 -n ${env.TARGET_NAMESPACE}"
+            echo "Switched to: ${inactiveVersion}"
+          }
+        }
+      }
+    }
+  }
+}

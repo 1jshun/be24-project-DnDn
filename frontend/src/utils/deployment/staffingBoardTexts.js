@@ -1,0 +1,85 @@
+export const STAFFING_BOARD_TEXTS = {
+  pageKicker: '투입 관리',
+  boardTitle: '인력 배치',
+  autoRec: '자동 추천 배치',
+  confirm: '배치 확정 및 저장',
+  zoneByZoneTitle: '구역별 인력 현황',
+  zoneReset: '초기화',
+  resetConfirmTitle: '인력 배치 초기화',
+  resetConfirmWarn: '모든 구역에 배치된 인력이 초기화됩니다.\n이대로 진행하시겠습니까?',
+  resetConfirmProceed: '초기화',
+  resetConfirmZoneCol: '구역',
+  resetConfirmCountCol: '배치 인원',
+  resetConfirmNoAssigned: '현재 배치된 인력이 없습니다.',
+  resetConfirmTotal: '총 초기화 인원',
+  savePlacementConfirmTitle: '배치 확정 및 저장',
+  savePlacementConfirmWarn:
+    '배치 내용을 확인하여 근태 기록을 업데이트합니다.\n이대로 진행하시겠습니까?',
+  savePlacementConfirmProceed: '진행',
+  workerPoolTitle: '작업자 현황',
+  needPerson: '필요 인원',
+  currentAssign: '현재 배치',
+  detailToggle: '상세 구역 · 투입 인원',
+  workerTableName: '작업자 이름',
+  colTrade: '공종',
+  colEmployment: '상용 / 일용',
+  colFatigue: '피로도 점수',
+  colFatiguePool: '피로도',
+  colPlacement: '투입 현황',
+  colProfile: '상세 프로필',
+  poolHeaderSelectAll: '표시된 미투입 인원 전체 선택',
+  showUnassignedOnly: '미투입',
+  filterAffil: '공종 구분',
+  searchWorker: '작업자 검색',
+  searchPh: '이름·공종으로 검색',
+  assignTarget: '투입 구역',
+  assignBtn: '선택 인력 투입',
+  assignNeedSelection: '투입할 작업자와 구역을 선택해 주세요.',
+  assignDone: '선택한 인력을 배치했습니다.',
+  assignOverflowTitle: '투입 인원 초과',
+  assignOverflowWarn:
+    '선택 인력 수가 해당 구역에 투입 가능한 인원보다 많습니다.\n구역을 바꾸거나 선택 인원을 줄인 뒤 다시 시도해 주세요.',
+  assignOverflowOk: '확인',
+  count: '명',
+  alertAuto: '부족 구역 위주로 투입 가능 인력을 자동 배치했습니다. (데모)',
+  totalWorkers: '보드 총인원',
+  poolListAggregate: '목록 집계',
+  countUnit: '명',
+  badgeDirect: '직영',
+  badgePartner: '협력',
+  badgeAgency: '인력',
+  tradeWarn:
+    '이 구역에 필요한 직종과 맞지 않을 수 있습니다. 배치는 가능하며, 안전/산업 관점에서 확인해 주세요.',
+  fatigueTitle:
+    '피로도 80점 이상 고위험. 안전사고·연속근무·교대간격·공종 위험도 항목 합(상한 100)으로 산정됩니다.',
+  skillCarpenter: '목공',
+  skillRebar: '철근',
+  skillWelder: '용접',
+  skillLabor: '인부',
+  editZone: '구역 수정',
+  zoneTitle: '구역명',
+  zoneSubtitle: '설명',
+  tradeNeedRows: '필요 직종별 인원',
+  addTradeRow: '직종 추가',
+  save: '저장',
+  cancel: '취소',
+  zoneTitleRequired: '구역명을 입력해 주세요.',
+  removeZone: '구역에서 제거',
+  workerDetail: '작업자 상세보기',
+  poolEmpty: '표시할 작업자가 없습니다.',
+  poolGroupToggle: '협력체 그룹 접기·펼치기',
+}
+
+export const STAFFING_TRADE_OPTIONS = [
+  { key: 'carpenter', labelKey: 'skillCarpenter' },
+  { key: 'rebar', labelKey: 'skillRebar' },
+  { key: 'welder', labelKey: 'skillWelder' },
+  { key: 'labor', labelKey: 'skillLabor' },
+]
+
+export function staffingTradeLabel(T, key) {
+  if (key === 'carpenter') return T.skillCarpenter
+  if (key === 'rebar') return T.skillRebar
+  if (key === 'welder') return T.skillWelder
+  return T.skillLabor
+}
