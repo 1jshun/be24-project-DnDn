@@ -54,9 +54,9 @@
   - [Kubernetes 워크로드 구성](#kubernetes-workloads)
   - [Ingress 기반 요청 경로 분리](#ingress-routing)
 - [2. Jenkins CI/CD 및 Blue-Green 배포](#cicd-blue-green)
-  - [서비스별 파이프라인 분리](#pipeline-separation)
+  - [Kubernetes Pod Agent와 서비스별 Pipeline](#pipeline-separation)
   - [변경 서비스만 배포하는 흐름](#selective-deployment)
-  - [Blue-Green 트래픽 전환 및 롤백](#traffic-switch-and-rollback)
+  - [Blue-Green 적용 및 트래픽 전환](#traffic-switch-and-rollback)
 - [3. 문서 관리 서비스 고도화](#document-service)
   - [문제 발견: 부하 테스트와 JVM 모니터링](#performance-bottleneck)
   - [문서 관리 서비스 분리](#document-service-extraction)
@@ -156,13 +156,22 @@ Client
 ## 2. Jenkins CI/CD 및 Blue-Green 배포
 
 <a id="pipeline-separation"></a>
-### 서비스별 파이프라인 분리
+### Kubernetes Pod Agent와 서비스별 Pipeline
 
-- 핵심 업무 서비스와 문서 관리 서비스의 Jenkins Pipeline을 분리
-- GitHub Webhook으로 변경 사항을 감지해 파이프라인 실행
-- 서비스별 Dockerfile과 배포 매니페스트를 기준으로 이미지 빌드 및 Kubernetes 배포 수행
+Jenkins Pipeline은 Kubernetes Pod Agent에서 실행되도록 구성했습니다. 파이프라인 실행마다 Gradle·Kaniko·kubectl 컨테이너를 포함한 Agent Pod를 생성해 빌드와 배포를 수행합니다.
 
-독립 파이프라인으로 구성해 한 서비스의 빌드·배포 실패가 다른 서비스의 배포를 막지 않도록 했습니다.
+- Gradle 컨테이너에서 서비스별 Spring Boot JAR 빌드
+- Kaniko 컨테이너에서 Docker daemon 없이 이미지 빌드·Docker Hub Push
+- Docker Hub 인증 정보는 Kubernetes Secret으로 마운트
+- kubectl 컨테이너에서 Kubernetes 리소스 배포 및 상태 확인
+- 핵심 업무·문서 관리·Gateway 서비스의 Pipeline을 분리해, 한 서비스의 배포 실패가 다른 서비스의 배포를 막지 않도록 구성
+
+#### 서비스별 CI/CD 분리 이유
+
+| 설계 | 목적 |
+|:---|:---|
+| 서비스별 Jenkins Pipeline 분리 | 한 서비스의 빌드·배포 실패가 다른 서비스의 배포를 중단시키지 않도록 영향 범위 격리 |
+| 변경 파일 경로 기반 실행 | 변경된 서비스만 빌드·이미지 Push·배포해 불필요한 전체 빌드와 배포 방지 |
 
 <a id="selective-deployment"></a>
 ### 변경 서비스만 배포하는 흐름
@@ -174,6 +183,8 @@ GitHub Webhook
   ↓
 변경된 서비스의 Jenkins Pipeline 실행
   ↓
+Gradle JAR 빌드
+  ↓
 Kaniko 이미지 빌드 및 Docker Hub Push
   ↓
 비활성(Blue 또는 Green) Deployment에 새 이미지 배포
@@ -184,17 +195,46 @@ Kaniko 이미지 빌드 및 Docker Hub Push
 - 빌드된 이미지는 Docker Hub에 푸시한 뒤 Kubernetes Deployment에서 사용
 
 <a id="traffic-switch-and-rollback"></a>
-### Blue-Green 트래픽 전환 및 롤백
+### Blue-Green 적용 및 트래픽 전환
+
+핵심 업무 서비스와 문서 관리 서비스에는 Blue-Green 배포를 적용하고, Gateway는 RollingUpdate 방식으로 운영했습니다.
+
+#### Blue-Green 선택 이유
+
+| 대상 | 선택 이유 |
+|:---|:---|
+| 기존 모놀리식 서비스 | 로그인, 인증, 프로젝트 관리 등 사용자 흐름의 중심 API입니다. 새 버전의 정상 기동을 확인하기 전에 기존 버전을 축소하면 서비스 전반에 영향이 발생할 수 있어, 비활성 환경에서 먼저 검증한 뒤 트래픽을 전환하도록 구성했습니다. |
+| 문서 관리 서비스 | MariaDB, Kafka, Elasticsearch, S3, Eureka 등 외부 의존성이 많아 환경 변수·Secret·연결 설정 문제의 영향을 받을 수 있습니다. 기존 Pod에 바로 반영하지 않고 비활성 환경에서 정상 동작을 확인한 뒤 트래픽을 전환하기 위해 Blue-Green 방식을 적용했습니다. |
+
+#### 배포 및 트래픽 전환 흐름
 
 ```text
-새 버전 배포 (비활성 환경)
+GitHub Push
   ↓
-rollout status 및 readiness 확인
-  ├─ 성공 → Kubernetes Service selector 전환 → 이전 버전 replica 축소
-  └─ 실패 → selector 유지 → 기존 활성 버전으로 서비스 지속
+GitHub Webhook
+  ↓
+Jenkins Pipeline 실행
+  ↓
+변경 파일 경로 분석
+  ↓
+변경된 서비스만 Gradle JAR 빌드
+  ↓
+Kaniko 이미지 빌드 및 Docker Hub Push
+  ↓
+Service selector로 현재 활성 색상 확인
+  ↓
+비활성 Deployment에 새 이미지 적용 및 replica 확장
+  ↓
+rollout status 대기
+  ↓
+Kubernetes Service selector를 새 버전으로 전환
+  ↓
+이전 Deployment replica를 0으로 축소
 ```
 
-새 버전은 현재 트래픽을 받지 않는 환경에 먼저 배포합니다. Pod가 정상 기동하고 readiness를 통과한 경우에만 Service selector를 전환합니다. 검증에 실패하면 트래픽을 전환하지 않으므로 기존 버전을 유지할 수 있습니다.
+<img width="982" height="285" alt="Image" src="https://github.com/user-attachments/assets/f1634490-cbd4-4eb9-b056-fa74f9646bb5" />
+
+Service selector로 현재 활성 색상을 확인한 뒤, 비활성 환경에 새 이미지를 배포하고 replica를 확장합니다. `rollout status`로 Pod의 정상 기동을 확인한 경우에만 selector를 전환합니다. 검증에 실패하면 selector를 변경하지 않으므로 기존 활성 버전이 트래픽을 계속 처리합니다.
 
 [목차로 돌아가기](#toc)
 
