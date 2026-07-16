@@ -53,7 +53,6 @@
   - [Kubernetes 클러스터 구성 및 운영](#kubernetes-cluster-operations)
   - [Kubernetes 워크로드 구성](#kubernetes-workloads)
   - [Ingress 기반 요청 경로 분리](#ingress-routing)
-  - [서비스 간 요청 흐름](#service-request-flow)
 - [2. Jenkins CI/CD 및 Blue-Green 배포](#cicd-blue-green)
   - [서비스별 파이프라인 분리](#pipeline-separation)
   - [변경 서비스만 배포하는 흐름](#selective-deployment)
@@ -75,6 +74,19 @@
 
 핵심 업무·문서 관리·Gateway·Discovery 서비스를 서비스별 Dockerfile로 분리해 이미지화했습니다. 각 Dockerfile은 Gradle 빌드 단계와 실행 단계를 분리한 멀티 스테이지 빌드로 구성해, 빌드 산출물인 Spring Boot JAR만 실행 이미지에 포함했습니다.
 
+<table>
+  <tr>
+    <td align="center">
+      <img width="435" height="316" alt="Image" src="https://github.com/user-attachments/assets/04e54128-669c-4c18-8f0f-8d0e0ca25412" />
+      <br />
+    </td>
+    <td align="center">
+      <img width="435" height="316" alt="image" src="https://github.com/user-attachments/assets/c216f74d-660e-40e8-a6d6-44ec2b090a6d" />
+      <br />
+    </td>
+  </tr>
+</table>
+
 - Gradle 의존성을 소스 코드보다 먼저 내려받아 의존성 레이어 캐시 활용
 - 서비스별 포트와 실행 JAR를 포함한 독립 이미지 생성
 - 빌드한 이미지를 Docker Hub에 push하고 Kubernetes Deployment의 실행 이미지로 지정
@@ -86,7 +98,9 @@ Source Code → Docker Image Build → Docker Hub Push → Kubernetes Deployment
 <a id="kubernetes-cluster-operations"></a>
 ### Kubernetes 클러스터 구성 및 운영
 
-Kubernetes 클러스터를 제어 노드와 작업 노드로 역할 분리해 구성했습니다. 애플리케이션 Pod는 작업 노드에서 실행되도록 운영했으며, 서비스 운영 용량을 확보하기 위해 작업 노드에 가상 디스크를 추가했습니다.
+Kubernetes 클러스터를 1대의 제어 노드와 6대의 작업 노드로 역할 분리해 구성했습니다. 애플리케이션 Pod는 작업 노드에서 실행되도록 운영했으며, 서비스 운영 용량을 확보하기 위해 작업 노드에 가상 디스크를 추가했습니다.
+
+<img width="434" height="201" alt="Image" src="https://github.com/user-attachments/assets/422e0cf2-8f8a-46ec-bd99-008a40484b8d" />
 
 Helm Chart를 활용해 Grafana, Kiali, Strimzi Kafka Operator, Longhorn, ECK 등 Kubernetes 운영 컴포넌트를 설치했습니다. 또한 Istio 서비스 메시를 적용해 서비스 간 통신을 관측했습니다.
 
@@ -132,16 +146,7 @@ Client
        └─ /api/msa  → gateway-service → Eureka → document-management-service
 ```
 
-<a id="service-request-flow"></a>
-### 서비스 간 요청 흐름
-
-```text
-[일반 업무 API]
-Client → Nginx Ingress → 핵심 업무 서비스
-
-[문서 관리 API]
-Client → Nginx Ingress → API Gateway → Eureka 서비스 디스커버리 → 문서 관리 서비스
-```
+<img width="859" height="452" alt="image" src="https://github.com/user-attachments/assets/ab4e1203-3239-460b-9cff-6fa98c73dc0e" />
 
 [목차로 돌아가기](#toc)
 
