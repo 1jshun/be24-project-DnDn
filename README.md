@@ -310,6 +310,8 @@ https://github.com/user-attachments/assets/71c798de-b2dd-4266-a72a-fe93e9484e42
    문서 이벤트의 빠른 수신과 조회용 Projection 갱신 특성을 고려해 Batch Listener를 적용했습니다. 갱신 대상 데이터를 모아 `saveAll` 기반으로 일괄 저장해 데이터 갱신 처리 효율을 높였습니다.
 
 <img width="1000" height="500" alt="Kafka work-order changed event" src="https://github.com/user-attachments/assets/e83dce29-eb0f-4ab2-80a8-10a71ef155d7" />
+
+#### 개선 결과
 <img width="1365" height="362" alt="image" src="https://github.com/user-attachments/assets/6e3f0698-2188-4680-bcd5-dc3afd8f1485" />
 
 
@@ -317,6 +319,7 @@ https://github.com/user-attachments/assets/71c798de-b2dd-4266-a72a-fe93e9484e42
 ### 검색 기능 고도화
 
 기존 문서 검색 API를 RDBMS의 복합 조건 조회와 `LIKE` 기반 키워드 검색으로 처리했습니다. 사용자 수가 `30명`에서 `100명`으로 증가하자 평균 TPS는 `54.3 → 62.2`로 소폭 증가했지만, 평균 응답 시간은 `223.69ms → 1,265.43ms`로 약 `5.66배` 증가했습니다.
+<img width="618" height="369<img width="1236" height="737" alt="image_(2)" src="https://github.com/user-attachments/assets/d211a1a0-5473-4e2f-b966-3170b121262c" />
 
 > **Situation**
 > RDBMS 검색 구조에서 다중 조건 검색과 `LIKE` 기반 키워드 검색 시 인덱스 활용 효율이 낮아, 사용자 증가에 따라 문서 검색 응답 시간 병목이 발생했습니다.
@@ -350,14 +353,11 @@ Elasticsearch 인덱스
 4. **Logstash 기반 증분 색인**
    애플리케이션에서 직접 색인하는 방식 대신 Logstash를 통해 원본 RDB 데이터를 Elasticsearch에 동기화했습니다. `updated_at` 기준 증분 동기화와 DB 조회 스케줄러를 적용해 중복 색인을 방지하고, RDBMS를 원본 데이터로 유지해 Elasticsearch 장애 시에도 재색인이 가능하도록 구성했습니다.
 
-<a id="performance-results"></a>
-### 개선 결과
+   <img width="869" height="317" alt="image" src="https://github.com/user-attachments/assets/6431e314-389b-4e3b-b248-e8107fc0b538" />
 
-| 항목 | 개선 전 | 개선 후 |
-|:---|---:|---:|
-| 문서 조회 평균 응답 시간 | 9,318.28ms | 223.69ms |
-| 문서 조회 오류 | 590건 | 0건 |
-| 검색 TPS | 62.2 | 219.5 |
-| 검색 평균 응답 시간 | 1,265.43ms | 129.98ms |
+
+<a id="performance-results"></a>
+#### 개선 결과
+<img width="1418" height="386" alt="image" src="https://github.com/user-attachments/assets/44e69fef-eba0-4bee-9dc6-f8f10578574b" />
 
 [목차로 돌아가기](#toc)
