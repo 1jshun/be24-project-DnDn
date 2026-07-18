@@ -314,9 +314,17 @@ https://github.com/user-attachments/assets/71c798de-b2dd-4266-a72a-fe93e9484e42
 
 
 <a id="elasticsearch-search"></a>
-### ECK 기반 Elasticsearch 문서 검색
+### 검색 기능 고도화
 
-ECK Operator로 Elasticsearch 클러스터를 운영하고, Logstash로 원본 RDB 데이터를 증분 색인했습니다. Kibana로 색인 상태와 검색 결과를 검증해 문서 통합 검색 기능을 구성했습니다.
+기존 문서 검색 API를 RDBMS의 복합 조건 조회와 `LIKE` 기반 키워드 검색으로 처리했습니다. 사용자 수가 `30명`에서 `100명`으로 증가하자 평균 TPS는 `54.3 → 62.2`로 소폭 증가했지만, 평균 응답 시간은 `223.69ms → 1,265.43ms`로 약 `5.66배` 증가했습니다.
+
+> **Situation**
+> RDBMS 검색 구조에서 다중 조건 검색과 `LIKE` 기반 키워드 검색 시 인덱스 활용 효율이 낮아, 사용자 증가에 따라 문서 검색 응답 시간 병목이 발생했습니다.
+>
+> **Task**
+> RDBMS 기반 문서 검색 병목을 해소하고, 사용자 증가 상황에서도 안정적인 검색 응답 시간을 확보해야 했습니다.
+
+문서 검색 요청이 RDBMS의 복합 조건 조회와 `LIKE` 기반 검색에 의존하지 않도록, ECK Operator 기반 Elasticsearch·Logstash·Kibana 검색 구조로 전환했습니다.
 
 ```text
 MariaDB 원본 데이터
@@ -328,11 +336,19 @@ Elasticsearch 인덱스
 문서 검색 API
 ```
 
-- 파일명, 문서 유형, 공종, 작성일, 본문 텍스트를 대상으로 통합 검색 제공
-- Nori 형태소 분석기와 사전·동의어 필터를 적용해 건설 도메인 용어 검색 정확도 개선
-- RDBMS를 원본 데이터로 유지하고 `updated_at` 기준 Logstash 증분 동기화 구성
-- Kibana로 색인된 문서 데이터와 검색 결과를 검증
-- Elasticsearch 장애 시 RDBMS 검색으로 fallback하도록 구성
+#### 검색 구조 전환
+
+1. **ECK 기반 Elasticsearch 클러스터 운영**
+   VM에 Elasticsearch를 직접 구축하는 대신 Kubernetes 환경에서 ECK Operator로 Elasticsearch 클러스터를 구성했습니다. Elasticsearch·Logstash·Kibana를 분리 배포해 색인, 검색, 검증 역할을 나누고, Kibana로 클러스터 상태와 색인 결과를 확인했습니다.
+
+2. **검색 인덱스 및 샤드 운영 구조 설계**
+   문서 검색 데이터를 Elasticsearch 인덱스로 구성하고, 주요 검색 필드는 `text`·`keyword` 매핑을 적용해 전문 검색과 정확 일치 검색을 함께 지원했습니다. 검색 가용성과 부하 분산을 위해 3-Node Cluster를 구성하고 Primary·Replica 샤드 구조를 적용했습니다.
+
+3. **검색 분석기 설계**
+   한국어 검색 정확도를 높이기 위해 Nori 형태소 분석기를 적용했습니다. 또한 사용자 사전으로 건설 도메인 용어가 잘못 분리되지 않도록 하고, 동의어 필터를 적용해 동일 의미의 다양한 표현도 함께 검색되도록 구성했습니다.
+
+4. **Logstash 기반 증분 색인**
+   애플리케이션에서 직접 색인하는 방식 대신 Logstash를 통해 원본 RDB 데이터를 Elasticsearch에 동기화했습니다. `updated_at` 기준 증분 동기화와 DB 조회 스케줄러를 적용해 중복 색인을 방지하고, RDBMS를 원본 데이터로 유지해 Elasticsearch 장애 시에도 재색인이 가능하도록 구성했습니다.
 
 <a id="performance-results"></a>
 ### 개선 결과
